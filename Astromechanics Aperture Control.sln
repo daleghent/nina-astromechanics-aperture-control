@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.31903.286
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{01E69F8A-89C3-4E03-8F03-BC1A468FF276}") = "Astromechanics Aperture Control", "Astromechanics Aperture Control.csproj", "{64A5AB9F-B0CF-44BF-8EAD-2F7A81775B23}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{64A5AB9F-B0CF-44BF-8EAD-2F7A81775B23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64A5AB9F-B0CF-44BF-8EAD-2F7A81775B23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64A5AB9F-B0CF-44BF-8EAD-2F7A81775B23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64A5AB9F-B0CF-44BF-8EAD-2F7A81775B23}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {07BEC466-9B13-439A-A41F-1325E5B24126}
+	EndGlobalSection
+EndGlobal

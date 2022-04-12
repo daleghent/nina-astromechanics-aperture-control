@@ -1,0 +1,6 @@
+﻿# Astromechanics Aperture Control
+
+## 1.0.0.0 - 2022-04-02
+* Initial Release
+* Added **Device Action** instruction
+* Added tabbed Imaging screen **Device Actions and Commands** anchorable window
