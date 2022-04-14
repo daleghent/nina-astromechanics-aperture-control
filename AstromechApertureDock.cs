@@ -28,7 +28,7 @@ namespace DaleGhent.NINA.AstromechApertureControl {
         private readonly IFocuserMediator focuserMediator;
         private readonly List<string> wantedDrivers;
         private readonly List<string> wantedActions;
-        private string previousDriver = string.Empty;
+        private bool seen = true;
 
         [ImportingConstructor]
         public AstromechApertureDock(IProfileService profileService, IFocuserMediator focuserMediator) : base(profileService) {
@@ -104,47 +104,56 @@ namespace DaleGhent.NINA.AstromechApertureControl {
             FocuserInfo = focuserInfo;
 
             if (FocuserInfo.Connected) {
-                if (!FocuserInfo.DeviceId.Equals(previousDriver)) {
-                    previousDriver = FocuserInfo.DeviceId;
+                if (!wantedDrivers.Contains(FocuserInfo.DeviceId)) {
+                    if (!seen) Logger.Error($"{FocuserInfo.Name} is not a supported driver");
+                    DriverAvailable = false;
+                    seen = true;
+                    return;
+                }
 
-                    if (!wantedDrivers.Contains(FocuserInfo.DeviceId)) {
-                        Logger.Error($"{FocuserInfo.Name} is not a supported driver");
-                        return;
-                    }
-
-                    foreach (var action in wantedActions) {
-                        if (!FocuserInfo.SupportedActions.Contains(action)) {
-                            Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DeviceId}) does not contain the required actions");
-                            return;
-                        }
-                    }
-
-                    var driverVersion = new Version(FocuserInfo.DriverVersion);
-                    var pluginVersion = new Version(Utility.GetVersion());
-
-                    if (driverVersion.Major != pluginVersion.Major) {
-                        Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DriverVersion}) major version mismatch");
-                        return;
-                    } else if (driverVersion.Minor != pluginVersion.Minor) {
-                        Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DriverVersion}) minor version mismatch");
+                foreach (var action in wantedActions) {
+                    if (!FocuserInfo.SupportedActions.Contains(action)) {
+                        if (!seen) Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DeviceId}) does not contain the required actions");
+                        DriverAvailable = false;
+                        seen = true;
                         return;
                     }
                 }
 
-                string lensModel = focuserMediator.Action("GetLensModel", string.Empty);
+                var driverVersion = new Version(FocuserInfo.DriverVersion);
+                var pluginVersion = new Version(Utility.GetVersion());
 
-                if (!string.IsNullOrEmpty(lensModel) && !LensModel.Equals(lensModel)) {
-                    LensModel = lensModel;
-                    FocalRatios = focuserMediator.Action("GetFocalRatioList", string.Empty).Split(':').ToList();
+                if (driverVersion.Major != pluginVersion.Major) {
+                    if (!seen) Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DriverVersion}) major version mismatch");
+                    DriverAvailable = false;
+                    seen = true;
+                    return;
+                } else if (driverVersion.Minor != pluginVersion.Minor) {
+                    if (!seen) Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DriverVersion}) minor version mismatch");
+                    DriverAvailable = false;
+                    seen = true;
+                    return;
+                }
 
-                    int.TryParse(focuserMediator.Action("GetApertureIndex", string.Empty), out apertureIndex);
-                    RaisePropertyChanged("ApertureIndex");
+                seen = true;
+
+                try {
+                    string lensModel = focuserMediator.Action("GetLensModel", string.Empty);
+
+                    if (!string.IsNullOrEmpty(lensModel) && !LensModel.Equals(lensModel)) {
+                        LensModel = lensModel;
+                        FocalRatios = focuserMediator.Action("GetFocalRatioList", string.Empty).Split(':').ToList();
+
+                        int.TryParse(focuserMediator.Action("GetApertureIndex", string.Empty), out apertureIndex);
+                        RaisePropertyChanged("ApertureIndex");
+                    }
+                } catch (Exception ex) {
+                    Logger.Error($"Exception occurred: {ex.Message}");
                 }
 
                 DriverAvailable = true;
             } else {
                 DriverAvailable = false;
-                previousDriver = string.Empty;
                 LensModel = string.Empty;
                 focalRatios.Clear();
                 RaisePropertyChanged("FocalRatios");
