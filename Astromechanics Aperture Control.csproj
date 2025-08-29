@@ -29,4 +29,7 @@
   <ItemGroup>
     <Content Remove="C:\Users\daleg\.nuget\packages\accord\3.8.0\build\Accord.dll.config" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".github\workflows\github-action.yaml" />
+  </ItemGroup>
 </Project>
