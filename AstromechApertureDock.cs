@@ -1,7 +1,7 @@
 ﻿#region "copyright"
 
 /*
-    Copyright Dale Ghent <daleg@elemental.org>
+    Copyright 2022-2025 Dale Ghent <daleg@elemental.org>
     This Source Code Form is subject to the terms of the Mozilla Public
     License, v. 2.0. If a copy of the MPL was not distributed with this
     file, You can obtain one at http://mozilla.org/MPL/2.0/
@@ -9,26 +9,23 @@
 
 #endregion "copyright"
 
-using NINA.Core.Utility;
-using NINA.Equipment.Equipment.MyFocuser;
-using NINA.Equipment.Interfaces.Mediator;
-using NINA.Equipment.Interfaces.ViewModel;
-using NINA.Profile.Interfaces;
-using NINA.WPF.Base.ViewModel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Media;
+using NINA.Core.Utility;
+using NINA.Equipment.Interfaces.Mediator;
+using NINA.Equipment.Interfaces.ViewModel;
+using NINA.Profile.Interfaces;
+using NINA.WPF.Base.ViewModel;
 
 namespace DaleGhent.NINA.AstromechApertureControl {
 
     [Export(typeof(IDockableVM))]
-    public class AstromechApertureDock : DockableVM, IFocuserConsumer {
+    public class AstromechApertureDock : DockableVM {
         private readonly IFocuserMediator focuserMediator;
-        private readonly List<string> wantedDrivers;
-        private readonly List<string> wantedActions;
-        private bool seen = true;
 
         [ImportingConstructor]
         public AstromechApertureDock(IProfileService profileService, IFocuserMediator focuserMediator) : base(profileService) {
@@ -37,34 +34,21 @@ namespace DaleGhent.NINA.AstromechApertureControl {
             ImageGeometry = (GeometryGroup)System.Windows.Application.Current.Resources["CameraSVG"];
             ImageGeometry.Freeze();
 
-            wantedDrivers = Utility.WantedDrivers();
-            wantedActions = Utility.WantedActions();
-
             this.focuserMediator = focuserMediator;
-            this.focuserMediator.RegisterConsumer(this);
-            FocuserInfo = this.focuserMediator.GetInfo();
 
-            UpdateDeviceInfo(FocuserInfo);
+            this.focuserMediator.Connected += OnFocuserConnected;
+            this.focuserMediator.Disconnected += OnFocuserDisconnected;
+            UpdateDeviceInfo();
 
             if (DriverAvailable) {
-                int.TryParse(focuserMediator.Action("GetApertureIndex", string.Empty), out apertureIndex);
-                RaisePropertyChanged("ApertureIndex");
+                _ = int.TryParse(focuserMediator.Action("GetApertureIndex", string.Empty), out apertureIndex);
+                RaisePropertyChanged(nameof(ApertureIndex));
             }
         }
 
-        public FocuserInfo FocuserInfo { get; private set; }
+        private bool DriverAvailable { get; set; } = false;
 
-        private bool driverAvailable = false;
-
-        public bool DriverAvailable {
-            get => driverAvailable;
-            private set {
-                driverAvailable = value;
-                RaisePropertyChanged();
-            }
-        }
-
-        private List<string> focalRatios = new List<string>();
+        private List<string> focalRatios = [];
 
         public List<string> FocalRatios {
             get => focalRatios;
@@ -86,7 +70,7 @@ namespace DaleGhent.NINA.AstromechApertureControl {
             }
         }
 
-        private int apertureIndex = 0;
+        private int apertureIndex = -1;
 
         public int ApertureIndex {
             get => apertureIndex;
@@ -100,42 +84,23 @@ namespace DaleGhent.NINA.AstromechApertureControl {
 
         public override bool IsTool => true;
 
-        public void UpdateDeviceInfo(FocuserInfo focuserInfo) {
-            FocuserInfo = focuserInfo;
+        public Task UpdateDeviceInfo() {
+            var focuserInfo = focuserMediator.GetInfo();
 
-            if (FocuserInfo.Connected) {
-                if (!wantedDrivers.Contains(FocuserInfo.DeviceId)) {
-                    if (!seen) Logger.Error($"{FocuserInfo.Name} is not a supported driver");
+            if (focuserInfo.Connected) {
+                if (!Utility.WantedDrivers().Contains(focuserInfo.DeviceId)) {
+                    Logger.Error($"{focuserInfo.Name} is not a supported driver");
                     DriverAvailable = false;
-                    seen = true;
-                    return;
+                    return Task.CompletedTask;
                 }
 
-                foreach (var action in wantedActions) {
-                    if (!FocuserInfo.SupportedActions.Contains(action)) {
-                        if (!seen) Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DeviceId}) does not contain the required actions");
+                foreach (var action in Utility.WantedActions()) {
+                    if (!focuserInfo.SupportedActions.Contains(action)) {
+                        Logger.Error($"{focuserInfo.DeviceId} ({focuserInfo.DeviceId}) does not contain the required actions (wanted: {action}, has: {string.Join(',', focuserInfo.SupportedActions)}");
                         DriverAvailable = false;
-                        seen = true;
-                        return;
+                        return Task.CompletedTask;
                     }
                 }
-
-                var driverVersion = new Version(FocuserInfo.DriverVersion);
-                var pluginVersion = new Version(Utility.GetVersion());
-
-                if (driverVersion.Major != pluginVersion.Major) {
-                    if (!seen) Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DriverVersion}) major version mismatch");
-                    DriverAvailable = false;
-                    seen = true;
-                    return;
-                } else if (driverVersion.Minor != pluginVersion.Minor) {
-                    if (!seen) Logger.Error($"{FocuserInfo.DeviceId} ({FocuserInfo.DriverVersion}) minor version mismatch");
-                    DriverAvailable = false;
-                    seen = true;
-                    return;
-                }
-
-                seen = true;
 
                 try {
                     string lensModel = focuserMediator.Action("GetLensModel", string.Empty);
@@ -144,8 +109,14 @@ namespace DaleGhent.NINA.AstromechApertureControl {
                         LensModel = lensModel;
                         FocalRatios = focuserMediator.Action("GetFocalRatioList", string.Empty).Split(':').ToList();
 
-                        int.TryParse(focuserMediator.Action("GetApertureIndex", string.Empty), out apertureIndex);
-                        RaisePropertyChanged("ApertureIndex");
+                        _ = int.TryParse(focuserMediator.Action("GetApertureIndex", string.Empty), out int defaultApertureIndex);
+
+                        if (ApertureIndex == -1) {
+                            apertureIndex = defaultApertureIndex;
+                        }
+
+                        RaisePropertyChanged(nameof(FocalRatios));
+                        RaisePropertyChanged(nameof(ApertureIndex));
                     }
                 } catch (Exception ex) {
                     Logger.Error($"Exception occurred: {ex.Message}");
@@ -156,18 +127,18 @@ namespace DaleGhent.NINA.AstromechApertureControl {
                 DriverAvailable = false;
                 LensModel = string.Empty;
                 focalRatios.Clear();
-                RaisePropertyChanged("FocalRatios");
+                RaisePropertyChanged(nameof(FocalRatios));
             }
+
+            return Task.CompletedTask;
         }
 
-        public void Dispose() {
-            this.focuserMediator.RemoveConsumer(this);
+        private async Task OnFocuserConnected(object arg1, EventArgs args) {
+            await UpdateDeviceInfo();
         }
 
-        public void UpdateEndAutoFocusRun(AutoFocusInfo info) {
-        }
-
-        public void UpdateUserFocused(FocuserInfo info) {
+        private async Task OnFocuserDisconnected(object arg1, EventArgs args) {
+            await UpdateDeviceInfo();
         }
     }
 }

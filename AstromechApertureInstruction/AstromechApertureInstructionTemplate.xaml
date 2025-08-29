@@ -1,5 +1,5 @@
 ﻿<!--
-    Copyright Dale Ghent <daleg@elemental.org>
+    Copyright 2022-2025 Dale Ghent <daleg@elemental.org>
 
     This Source Code Form is subject to the terms of the Mozilla Public
     License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -27,6 +27,11 @@
                         VerticalAlignment="Center"
                         ItemsSource="{Binding FocalRatios}"
                         SelectedIndex="{Binding ApertureIndex}" />
+
+                    <TextBlock
+                        Margin="10,0,0,0"
+                        VerticalAlignment="Center"
+                        Text="{Binding LensModel}" />
                 </StackPanel>
             </nina:SequenceBlockView.SequenceItemContent>
         </nina:SequenceBlockView>
